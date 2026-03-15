@@ -11,7 +11,9 @@ export default function QRCodePage() {
   const [status, setStatus] = useState<Status>('checking')
   const [qrCode, setQrCode] = useState('')
   const [message, setMessage] = useState('')
+  const [logs, setLogs] = useState<string[]>([])
   const eventSourceRef = useRef<EventSource | null>(null)
+  const logsEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     checkStatus()
@@ -19,6 +21,10 @@ export default function QRCodePage() {
       eventSourceRef.current?.close()
     }
   }, [])
+
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [logs])
 
   const checkStatus = async () => {
     setStatus('checking')
@@ -36,10 +42,16 @@ export default function QRCodePage() {
     eventSourceRef.current?.close()
     setStatus('connecting')
     setQrCode('')
+    setLogs([])
     setMessage('Gerando QR Code...')
 
     const es = new EventSource('/api/whatsapp/connect')
     eventSourceRef.current = es
+
+    es.addEventListener('log', (e) => {
+      const data = JSON.parse(e.data)
+      setLogs((prev) => [...prev.slice(-50), data.text])
+    })
 
     es.addEventListener('qr', (e) => {
       const data = JSON.parse(e.data)
@@ -172,6 +184,20 @@ export default function QRCodePage() {
                       <Loader2 className="h-12 w-12 animate-spin mx-auto text-gray-400" />
                       <p className="mt-4 text-gray-600">{message}</p>
                     </>
+                  )}
+                  {logs.length > 0 && (
+                    <div className="mt-4 bg-gray-900 rounded-lg p-3 text-left max-h-48 overflow-y-auto">
+                      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-700">
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-gray-400 text-xs font-mono">logs</span>
+                      </div>
+                      {logs.map((log, i) => (
+                        <p key={i} className="text-green-400 text-xs font-mono leading-relaxed">
+                          {log}
+                        </p>
+                      ))}
+                      <div ref={logsEndRef} />
+                    </div>
                   )}
                 </div>
               )}

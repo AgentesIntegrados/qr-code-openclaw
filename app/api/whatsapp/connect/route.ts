@@ -52,6 +52,9 @@ export async function GET() {
           }
         }
 
+        // Send every line as a log event for real-time visibility
+        send('log', { text: clean })
+
         if (!capturing) {
           if (/scan this qr/i.test(clean)) return
 
