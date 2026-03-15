@@ -12,13 +12,26 @@ export default function QRCodePage() {
   const [qrCode, setQrCode] = useState('')
   const [message, setMessage] = useState('')
   const [logs, setLogs] = useState<string[]>([])
+  const [countdown, setCountdown] = useState(180)
   const eventSourceRef = useRef<EventSource | null>(null)
   const logsEndRef = useRef<HTMLDivElement | null>(null)
+  const countdownRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     checkStatus()
+    setCountdown(180)
+    countdownRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          window.location.reload()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
     return () => {
       eventSourceRef.current?.close()
+      if (countdownRef.current) clearInterval(countdownRef.current)
     }
   }, [])
 
@@ -64,6 +77,8 @@ export default function QRCodePage() {
       setStatus('connected')
       setQrCode('')
       setMessage(data.message || 'WhatsApp conectado com sucesso!')
+      if (countdownRef.current) clearInterval(countdownRef.current)
+      setCountdown(0)
       es.close()
     })
 
@@ -110,9 +125,16 @@ export default function QRCodePage() {
       <div className="w-full max-w-2xl">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl font-bold flex items-center gap-2">
-              <Smartphone className="h-6 w-6" />
-              Conectar WhatsApp
+            <CardTitle className="text-2xl font-bold flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Smartphone className="h-6 w-6" />
+                Conectar WhatsApp
+              </div>
+              {countdown > 0 && (
+                <span className="text-sm font-normal text-gray-400">
+                  {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>

@@ -64,7 +64,7 @@ export async function GET() {
         if (/scan this qr/i.test(clean)) return
 
         if (/linked|logged in|successfully|paired|authenticated|syncing|sync complete|bootstrap/i.test(clean)) {
-          send('connected', { message: clean })
+          send('connected', { message: 'Vinculado! Credenciais salvas com sucesso.' })
           // Restart gateway so OpenClaw picks up the new session
           send('log', { text: 'Reiniciando gateway...' })
           execFileAsync('openclaw', ['gateway', 'restart'], { timeout: 30000 })
