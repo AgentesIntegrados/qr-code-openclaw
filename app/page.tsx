@@ -154,11 +154,25 @@ export default function QRCodePage() {
 
               {status === 'connecting' && (
                 <div className="py-6">
-                  {qrCode ? (
-                    <>
-                      <p className="mb-4 font-medium">{message}</p>
+                  <div className="bg-gray-900 rounded-lg p-4 text-left overflow-auto">
+                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-700">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      <span className="text-gray-400 text-xs font-mono">Isso pode demorar um pouco, logo abaixo vai aparecer um QR para escanear do WhatsApp.</span>
+                    </div>
+                    {logs.length === 0 && !qrCode && (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-green-400" />
+                        <span className="text-green-400 text-xs font-mono">Iniciando...</span>
+                      </div>
+                    )}
+                    {logs.map((log, i) => (
+                      <p key={i} className="text-green-400 text-xs font-mono leading-relaxed">
+                        {log}
+                      </p>
+                    ))}
+                    {qrCode && (
                       <pre
-                        className="inline-block text-black"
+                        className="text-green-400 mt-2"
                         style={{
                           fontFamily: 'monospace',
                           fontSize: '8px',
@@ -166,37 +180,23 @@ export default function QRCodePage() {
                           letterSpacing: '0px',
                           whiteSpace: 'pre',
                           transform: 'scaleX(0.6)',
-                          transformOrigin: 'center top',
+                          transformOrigin: 'left top',
                         }}
                       >
                         {qrCode}
                       </pre>
-                      <p className="mt-4 text-sm text-gray-500">
+                    )}
+                    <div ref={logsEndRef} />
+                  </div>
+                  {qrCode && (
+                    <div className="mt-4 text-center">
+                      <p className="text-sm text-gray-500">
                         Abra o WhatsApp &gt; Aparelhos conectados &gt; Conectar aparelho
                       </p>
-                      <Button onClick={startConnection} variant="outline" className="mt-4">
+                      <Button onClick={startConnection} variant="outline" className="mt-3">
                         <RefreshCw className="mr-2 h-4 w-4" />
                         Gerar Novo QR Code
                       </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Loader2 className="h-12 w-12 animate-spin mx-auto text-gray-400" />
-                      <p className="mt-4 text-gray-600">{message}</p>
-                    </>
-                  )}
-                  {logs.length > 0 && (
-                    <div className="mt-4 bg-gray-900 rounded-lg p-3 text-left max-h-48 overflow-y-auto">
-                      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-700">
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-gray-400 text-xs font-mono">logs</span>
-                      </div>
-                      {logs.map((log, i) => (
-                        <p key={i} className="text-green-400 text-xs font-mono leading-relaxed">
-                          {log}
-                        </p>
-                      ))}
-                      <div ref={logsEndRef} />
                     </div>
                   )}
                 </div>

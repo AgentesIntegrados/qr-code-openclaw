@@ -1,4 +1,7 @@
-import { spawn } from 'child_process'
+import { spawn, execFile } from 'child_process'
+import { promisify } from 'util'
+
+const execFileAsync = promisify(execFile)
 
 export const dynamic = 'force-dynamic'
 
@@ -49,22 +52,28 @@ export async function GET() {
             }
             qrLines = []
             capturing = false
+            // Send this non-QR line as log
+            send('log', { text: clean })
           }
+          return
         }
 
-        // Send every line as a log event for real-time visibility
+        // Only send non-QR lines as logs
         send('log', { text: clean })
 
-        if (!capturing) {
-          if (/scan this qr/i.test(clean)) return
+        if (/scan this qr/i.test(clean)) return
 
-          if (/linked|logged in|successfully|paired|authenticated|syncing|sync complete|bootstrap/i.test(clean)) {
-            send('connected', { message: clean })
-          }
+        if (/linked|logged in|successfully|paired|authenticated|syncing|sync complete|bootstrap/i.test(clean)) {
+          send('connected', { message: clean })
+          // Restart gateway so OpenClaw picks up the new session
+          send('log', { text: 'Reiniciando gateway...' })
+          execFileAsync('openclaw', ['gateway', 'restart'], { timeout: 30000 })
+            .then(() => send('log', { text: 'Gateway reiniciado com sucesso!' }))
+            .catch(() => send('log', { text: 'Aviso: falha ao reiniciar gateway' }))
+        }
 
-          if (/failed|error|timeout/i.test(clean) && !sent) {
-            send('error', { message: clean })
-          }
+        if (/failed|error|timeout/i.test(clean) && !sent) {
+          send('error', { message: clean })
         }
       }
 
