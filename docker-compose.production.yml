@@ -1,0 +1,240 @@
+version: '3.8'
+
+services:
+
+## --------------------------- POSTGRESQL --------------------------- ##
+
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: evolution_db
+      POSTGRES_USER: evo_user
+      POSTGRES_PASSWORD: evo_pass_5437
+      POSTGRES_MULTIPLE_DATABASES: evolution_db,disparador_db,n8n_db
+    volumes:
+      - postgres_db_data:/var/lib/postgresql/data
+      - ./init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - postgres-mcp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evo_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+## --------------------------- REDIS --------------------------- ##
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - postgres-mcp-network
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+## --------------------------- EVOLUTION API --------------------------- ##
+
+  evolution_api:
+    image: atendai/evolution-api:latest
+    container_name: evolution_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - evolution_data:/evolution/store
+    environment:
+      # Auth
+      AUTHENTICATION_API_KEY: plataforma2025
+      
+      # Database
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evo_user:evo_pass_5437@postgres_db:5432/evolution_db
+      
+      # Redis
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379
+      CACHE_REDIS_PREFIX_KEY: evolution_v2
+      
+      # Server
+      SERVER_URL: ${SERVER_URL:-http://localhost:8080}
+      
+      # WhatsApp Config
+      INTEGRATION: WHATSAPP-BAILEYS
+      CONFIG_SESSION_PHONE_VERSION: "2.3000.1019433875"
+      CONFIG_SESSION_PHONE_CLIENT: Google
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      QRCODE_LIMIT: 1902
+      
+      # Logs
+      LOG_LEVEL: ERROR
+      LOG_COLOR: "true"
+      
+      # Language
+      LANGUAGE: pt-BR
+      
+      # Instance Config
+      DEL_INSTANCE_TIME: "false"
+      INSTANCE_EXPIRATION_TIME: "false"
+      
+      # Webhook
+      WEBHOOK_GLOBAL_ENABLED: ${WEBHOOK_GLOBAL_ENABLED:-false}
+      WEBHOOK_GLOBAL_URL: ${WEBHOOK_GLOBAL_URL:-http://n8n:5678/webhook/evolution}
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - postgres-mcp-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+## --------------------------- N8N --------------------------- ##
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    environment:
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-abf263272af9267a1314b7c9158499b42bd58d7fb6907494b475f3fc857362a8}
+      - N8N_BASIC_AUTH_ACTIVE=false
+      - N8N_USER_MANAGEMENT_DISABLED=false
+      - N8N_HOST=0.0.0.0
+      - N8N_PROTOCOL=http
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres_db
+      - DB_POSTGRESDB_DATABASE=n8n_db
+      - DB_POSTGRESDB_USER=evo_user
+      - DB_POSTGRESDB_PASSWORD=evo_pass_5437
+      - REDIS_HOST=redis
+      - N8N_SECURE_COOKIE=false
+    networks:
+      - postgres-mcp-network
+    ports:
+      - "5678:5678"
+    restart: unless-stopped
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5678/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+## --------------------------- DISPARADOR --------------------------- ##
+
+  disparador:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: disparador:latest
+    container_name: disparador
+    restart: unless-stopped
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      evolution_api:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    volumes:
+      - disparador_data:/app/public/uploads
+    networks:
+      - postgres-mcp-network
+    environment:
+      ## Dados de acesso
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      AUTH_USERNAME: ${AUTH_USERNAME:-admin}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-admin}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8}
+
+      ## Banco de dados PostgreSQL
+      DATABASE_URL: postgresql://evo_user:evo_pass_5437@postgres_db:5432/disparador_db?sslmode=disable
+      
+      ## Preenchimento automatico
+      NEXT_PUBLIC_AUTO_FILL_DDI: "true"
+      NEXT_PUBLIC_DEFAULT_LOCATION: BR
+
+      ## Dados da Evolution API (conecta internamente)
+      NEXT_PUBLIC_EVOLUTION_URL: http://evolution_api:8080
+      NEXT_PUBLIC_EVOLUTION_API: plataforma2025
+
+      ## Dados do Chatwoot (opcional)
+      NEXT_PUBLIC_CHATWOOT_INTEGRATION: ${NEXT_PUBLIC_CHATWOOT_INTEGRATION:-false}
+      NEXT_PUBLIC_CHATWOOT_DOMAIN: ${NEXT_PUBLIC_CHATWOOT_DOMAIN:-}
+      NEXT_PUBLIC_CHATWOOT_ACCOUNT_ID: ${NEXT_PUBLIC_CHATWOOT_ACCOUNT_ID:-}
+      NEXT_PUBLIC_CHATWOOT_TOKEN: ${NEXT_PUBLIC_CHATWOOT_TOKEN:-}
+      NEXT_PUBLIC_CHATWOOT_DATABASE_CONNECTION_URI: ${NEXT_PUBLIC_CHATWOOT_DATABASE_CONNECTION_URI:-}
+
+      ## Modo
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+## --------------------------- POSTGRES MCP (opcional) --------------------------- ##
+
+  postgres-mcp:
+    build: 
+      context: ./postgres-mcp
+      dockerfile: Dockerfile
+    image: postgres-mcp:latest
+    container_name: postgres-mcp
+    environment:
+      DATABASE_URI: postgresql://evo_user:evo_pass_5437@postgres_db:5432/disparador_db
+    networks:
+      - postgres-mcp-network
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+## --------------------------- NETWORKS --------------------------- ##
+
+networks:
+  postgres-mcp-network:
+    driver: bridge
+    name: postgres-mcp-network
+
+## --------------------------- VOLUMES --------------------------- ##
+
+volumes:
+  postgres_db_data:
+    driver: local
+  redis_data:
+    driver: local
+  n8n_data:
+    driver: local
+  evolution_data:
+    driver: local
+  disparador_data:
+    driver: local

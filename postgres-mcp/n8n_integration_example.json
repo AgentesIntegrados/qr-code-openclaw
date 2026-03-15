@@ -1,0 +1,119 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://postgres-sse.agentesintegrados.com/api/list-schemas",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer EYjpWqb7YS1kJ0TKdJtVRN7Zj654NZbq6Ewe7RCHtPs"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http_list_schemas",
+      "name": "List PostgreSQL Schemas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://postgres-sse.agentesintegrados.com/api/execute-query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer EYjpWqb7YS1kJ0TKdJtVRN7Zj654NZbq6Ewe7RCHtPs"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http_execute_query",
+      "name": "List Public Tables",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://postgres-sse.agentesintegrados.com/api/health-check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer EYjpWqb7YS1kJ0TKdJtVRN7Zj654NZbq6Ewe7RCHtPs"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http_health_check",
+      "name": "Database Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 500]
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "List PostgreSQL Schemas",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Database Health Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List PostgreSQL Schemas": {
+      "main": [
+        [
+          {
+            "node": "List Public Tables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

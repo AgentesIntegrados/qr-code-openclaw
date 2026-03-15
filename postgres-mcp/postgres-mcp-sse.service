@@ -1,0 +1,20 @@
+[Unit]
+Description=PostgreSQL MCP SSE Server
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.claude/postgres-mcp
+Environment="DATABASE_URI=postgresql://evo_user:evo_pass@localhost:5439/evolution_db"
+Environment="PYTHONPATH=/root/.claude/postgres-mcp"
+ExecStart=/root/.claude/postgres-mcp/venv/bin/python -m src.postgres_mcp.server_sse --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=append:/var/log/postgres-mcp-sse.log
+StandardError=append:/var/log/postgres-mcp-sse.error.log
+
+[Install]
+WantedBy=multi-user.target

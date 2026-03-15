@@ -1,0 +1,152 @@
+{
+  "name": "PostgreSQL Chat Memory Integration",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual_trigger",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "content": "## PostgreSQL SSE API - Chat Memory\n\n### Configuração:\n- **URL Base**: https://postgres-sse.agentesintegrados.com\n- **Token**: Bearer EYjpWqb7YS1kJ0TKdJtVRN7Zj654NZbq6Ewe7RCHtPs\n- **Banco**: chat_memory_raphael\n\n### Endpoints Disponíveis:\n1. `/api/list-schemas` - Lista schemas\n2. `/api/list-tables` - Lista tabelas\n3. `/api/execute-query` - Executa queries\n4. `/api/health-check` - Verifica saúde do banco",
+        "height": 300,
+        "width": 600
+      },
+      "id": "sticky_note",
+      "name": "Documentação",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [100, 100]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Configuração da API\nconst baseUrl = 'https://postgres-sse.agentesintegrados.com';\nconst token = 'EYjpWqb7YS1kJ0TKdJtVRN7Zj654NZbq6Ewe7RCHtPs';\n\n// Adicionar configuração aos items\nreturn items.map(item => {\n  return {\n    json: {\n      ...item.json,\n      api_config: {\n        baseUrl,\n        token,\n        headers: {\n          'Authorization': `Bearer ${token}`,\n          'Content-Type': 'application/json'\n        }\n      }\n    }\n  };\n});"
+      },
+      "id": "code_config",
+      "name": "Setup API Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.api_config.baseUrl }}/api/execute-query",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.api_config.headers.Authorization }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"query\": \"SELECT COUNT(*) as total_messages, COUNT(DISTINCT session_id) as total_sessions FROM chat_memory\"\n}",
+        "options": {}
+      },
+      "id": "http_stats",
+      "name": "Get Chat Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.api_config.baseUrl }}/api/execute-query",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.api_config.headers.Authorization }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"query\": \"SELECT session_id, role, content, created_at FROM chat_memory ORDER BY created_at DESC LIMIT 10\"\n}",
+        "options": {}
+      },
+      "id": "http_recent",
+      "name": "Get Recent Messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.api_config.baseUrl }}/api/execute-query",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.api_config.headers.Authorization }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"query\": \"INSERT INTO chat_memory (session_id, role, content) VALUES ('{{ $json.session_id }}', '{{ $json.role }}', '{{ $json.content }}') RETURNING *\"\n}",
+        "options": {}
+      },
+      "id": "http_insert",
+      "name": "Insert Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300],
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Setup API Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup API Config": {
+      "main": [
+        [
+          {
+            "node": "Get Chat Stats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Recent Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  postgres-mcp:
+    build: .
+    image: postgres-mcp:latest
+    container_name: postgres-mcp
+    environment:
+      - DATABASE_URI=${DATABASE_URI}
+    networks:
+      - mcp-network
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+networks:
+  mcp-network:
+    driver: bridge
+    name: postgres-mcp-network
