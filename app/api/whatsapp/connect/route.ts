@@ -13,8 +13,12 @@ export async function GET() {
         )
       }
 
-      const proc = spawn('wacli', ['auth', '--idle-exit', '120s'], {
-        env: { ...process.env, HOME: process.env.HOME || '/home/agents' },
+      // Use openclaw channels login instead of wacli directly
+      const proc = spawn('openclaw', ['channels', 'login', '--channel', 'whatsapp'], {
+        env: {
+          ...process.env,
+          HOME: process.env.HOME || '/root',
+        },
       })
 
       let qrLines: string[] = []
@@ -22,30 +26,42 @@ export async function GET() {
       let sent = false
 
       function processLine(line: string) {
-        // Detect QR start (line full of block chars)
-        if (!capturing && /^[█▀▄▁▂▃▅▆▇░▒▓\s]{10,}$/.test(line)) {
+        // Strip ANSI escape codes and carriage returns
+        const clean = line.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r/g, '').trim()
+        if (!clean) return
+
+        // Detect QR start: line of ▄ chars (openclaw format) or █ chars (wacli format)
+        if (!capturing && (/^[▄]{10,}$/.test(clean) || /^[█]{10,}$/.test(clean))) {
           capturing = true
-          qrLines = [line]
+          qrLines = [clean]
           return
         }
 
         if (capturing) {
-          qrLines.push(line)
-          // QR ends with a line of lower-half blocks or thin bar
-          if (/^[▀▔\s─━]+$/.test(line) || (qrLines.length > 5 && line.trim() === '')) {
-            send('qr', { qr: qrLines.join('\n') })
+          // If line has block chars, it's part of the QR
+          if (/[█▄▀]/.test(clean)) {
+            qrLines.push(clean)
+          } else {
+            // Non-block line means QR is done
+            if (qrLines.length > 5) {
+              send('qr', { qr: qrLines.join('\n') })
+              sent = true
+            }
             qrLines = []
             capturing = false
-            sent = true
           }
         }
 
-        if (/linked|connected|authenticated|saved/i.test(line)) {
-          send('connected', { message: line.trim() })
-        }
+        if (!capturing) {
+          if (/scan this qr/i.test(clean)) return
 
-        if (/failed|error|timeout/i.test(line) && !sent) {
-          send('error', { message: line.trim() })
+          if (/linked|logged in|successfully|paired|authenticated|syncing|sync complete|bootstrap/i.test(clean)) {
+            send('connected', { message: clean })
+          }
+
+          if (/failed|error|timeout/i.test(clean) && !sent) {
+            send('error', { message: clean })
+          }
         }
       }
 
@@ -55,7 +71,7 @@ export async function GET() {
         const lines = buffer.split('\n')
         buffer = lines.pop() || ''
         for (const line of lines) {
-          if (line.trim()) processLine(line)
+          processLine(line)
         }
       }
 
@@ -75,11 +91,9 @@ export async function GET() {
         controller.close()
       })
 
-      // Kill process if client disconnects (AbortSignal not available in start,
-      // so we set a max lifetime)
       const timeout = setTimeout(() => {
         proc.kill('SIGTERM')
-      }, 5 * 60 * 1000) // 5 min max
+      }, 5 * 60 * 1000)
 
       proc.on('close', () => clearTimeout(timeout))
     },

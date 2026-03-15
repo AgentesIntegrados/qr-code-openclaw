@@ -145,19 +145,20 @@ export default function QRCodePage() {
                   {qrCode ? (
                     <>
                       <p className="mb-4 font-medium">{message}</p>
-                      <div className="inline-block bg-black rounded-lg p-2 shadow-lg">
-                        <pre
-                          className="text-white leading-none"
-                          style={{
-                            fontSize: '4px',
-                            lineHeight: '4px',
-                            letterSpacing: '0px',
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          {qrCode}
-                        </pre>
-                      </div>
+                      <pre
+                        className="inline-block text-black"
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: '8px',
+                          lineHeight: '8px',
+                          letterSpacing: '0px',
+                          whiteSpace: 'pre',
+                          transform: 'scaleX(0.6)',
+                          transformOrigin: 'center top',
+                        }}
+                      >
+                        {qrCode}
+                      </pre>
                       <p className="mt-4 text-sm text-gray-500">
                         Abra o WhatsApp &gt; Aparelhos conectados &gt; Conectar aparelho
                       </p>
