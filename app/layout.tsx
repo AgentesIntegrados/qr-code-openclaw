@@ -1,8 +1,6 @@
-import { Footer } from "@/components/footer"
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { LanguageProvider } from '@/contexts/LanguageContext'
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -12,17 +10,9 @@ const geistSans = localFont({
   display: 'swap'
 });
 
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-  preload: true,
-  display: 'swap'
-});
-
 export const metadata: Metadata = {
-  title: "Disparador Orion",
-  description: "By OrionDesign",
+  title: "QR Code - OpenClaw",
+  description: "Conectar WhatsApp via QR Code",
 };
 
 export default function RootLayout({
@@ -32,13 +22,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
-        <LanguageProvider>
-          <div className="flex-1 flex flex-col h-screen">
-            {children}
-            <Footer />
-          </div>
-        </LanguageProvider>
+      <body className={`${geistSans.variable} antialiased`}>
+        {children}
       </body>
     </html>
   );

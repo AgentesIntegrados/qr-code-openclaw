@@ -1,1 +1,0 @@
-sempre responda em pt br ao usuario
