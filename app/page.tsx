@@ -12,26 +12,14 @@ export default function QRCodePage() {
   const [qrCode, setQrCode] = useState('')
   const [message, setMessage] = useState('')
   const [logs, setLogs] = useState<string[]>([])
-  const [countdown, setCountdown] = useState(180)
+  const [qrReady, setQrReady] = useState(false)
   const eventSourceRef = useRef<EventSource | null>(null)
   const logsEndRef = useRef<HTMLDivElement | null>(null)
-  const countdownRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     checkStatus()
-    setCountdown(180)
-    countdownRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          window.location.reload()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
     return () => {
       eventSourceRef.current?.close()
-      if (countdownRef.current) clearInterval(countdownRef.current)
     }
   }, [])
 
@@ -55,6 +43,7 @@ export default function QRCodePage() {
     eventSourceRef.current?.close()
     setStatus('connecting')
     setQrCode('')
+    setQrReady(false)
     setLogs([])
     setMessage('Gerando QR Code...')
 
@@ -69,16 +58,16 @@ export default function QRCodePage() {
     es.addEventListener('qr', (e) => {
       const data = JSON.parse(e.data)
       setQrCode(data.qr)
-      setMessage('Escaneie o QR Code com seu WhatsApp')
+      setQrReady(true)
+      setMessage('QR Code pronto! Escaneie com seu WhatsApp')
     })
 
     es.addEventListener('connected', (e) => {
       const data = JSON.parse(e.data)
       setStatus('connected')
       setQrCode('')
+      setQrReady(false)
       setMessage(data.message || 'WhatsApp conectado com sucesso!')
-      if (countdownRef.current) clearInterval(countdownRef.current)
-      setCountdown(0)
       es.close()
     })
 
@@ -130,9 +119,10 @@ export default function QRCodePage() {
                 <Smartphone className="h-6 w-6" />
                 Conectar WhatsApp
               </div>
-              {countdown > 0 && (
-                <span className="text-sm font-normal text-gray-400">
-                  {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
+              {qrReady && (
+                <span className="text-sm font-medium text-green-500 flex items-center gap-1">
+                  <CheckCircle className="h-4 w-4" />
+                  QR Code pronto
                 </span>
               )}
             </CardTitle>
@@ -150,16 +140,6 @@ export default function QRCodePage() {
                 <div className="py-12">
                   <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
                   <p className="mt-4 text-lg font-medium text-green-600">{message}</p>
-                  <div className="mt-6 flex gap-3 justify-center">
-                    <Button onClick={checkStatus} variant="outline">
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Atualizar
-                    </Button>
-                    <Button onClick={disconnect} variant="destructive">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Desconectar
-                    </Button>
-                  </div>
                 </div>
               )}
 

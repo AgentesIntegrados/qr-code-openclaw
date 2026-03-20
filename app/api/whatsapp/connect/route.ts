@@ -1,7 +1,57 @@
 import { spawn, execFile } from 'child_process'
 import { promisify } from 'util'
+import { readFile } from 'fs/promises'
+import { join } from 'path'
 
 const execFileAsync = promisify(execFile)
+
+async function getLinkedNumber(): Promise<string | null> {
+  try {
+    const home = process.env.HOME || '/root'
+    const credsPath = join(home, '.openclaw', 'credentials', 'whatsapp', 'default', 'creds.json')
+    const creds = JSON.parse(await readFile(credsPath, 'utf-8'))
+    const jid = creds?.me?.id // "5521936182339:80@s.whatsapp.net"
+    if (!jid) return null
+    const number = jid.split(':')[0]
+    return '+' + number
+  } catch {
+    return null
+  }
+}
+
+async function lockDmToOwner(phone: string) {
+  try {
+    const home = process.env.HOME || '/root'
+    const cfgPath = join(home, '.openclaw', 'openclaw.json')
+    const cfg = JSON.parse(await readFile(cfgPath, 'utf-8'))
+    const wa = cfg.channels?.whatsapp || {}
+    wa.dmPolicy = 'allowlist'
+    wa.allowFrom = [phone]
+    wa.groupPolicy = 'disabled'
+    cfg.channels = { ...cfg.channels, whatsapp: wa }
+    const { writeFile } = await import('fs/promises')
+    await writeFile(cfgPath, JSON.stringify(cfg, null, 2))
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function sendWelcomeMessage(phone: string) {
+  try {
+    await execFileAsync('openclaw', [
+      'message', 'send',
+      '--target', phone,
+      '--message', 'Meu coração está batendo... */new* sempre que quiser iniciar um novo assunto.'
+    ], {
+      env: { ...process.env, HOME: process.env.HOME || '/root' },
+      timeout: 30000
+    })
+    return true
+  } catch {
+    return false
+  }
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -65,11 +115,35 @@ export async function GET() {
 
         if (/linked|logged in|successfully|paired|authenticated|syncing|sync complete|bootstrap/i.test(clean)) {
           send('connected', { message: 'Vinculado! Credenciais salvas com sucesso.' })
-          // Restart gateway so OpenClaw picks up the new session
-          send('log', { text: 'Reiniciando gateway...' })
-          execFileAsync('openclaw', ['gateway', 'restart'], { timeout: 30000 })
-            .then(() => send('log', { text: 'Gateway reiniciado com sucesso!' }))
-            .catch(() => send('log', { text: 'Aviso: falha ao reiniciar gateway' }))
+
+          // Post-connect: lock DM, restart gateway, send welcome
+          ;(async () => {
+            const phone = await getLinkedNumber()
+            if (phone) {
+              const locked = await lockDmToOwner(phone)
+              if (locked) {
+                send('log', { text: `Acesso restrito ao dono: ${phone}` })
+              }
+            }
+
+            send('log', { text: 'Reiniciando gateway...' })
+            try {
+              await execFileAsync('openclaw', ['gateway', 'restart'], { timeout: 30000 })
+              send('log', { text: 'Gateway reiniciado com sucesso!' })
+              await new Promise(r => setTimeout(r, 8000))
+              if (phone) {
+                send('log', { text: `Enviando boas-vindas para ${phone}...` })
+                const ok = await sendWelcomeMessage(phone)
+                if (ok) {
+                  send('log', { text: 'Mensagem de boas-vindas enviada!' })
+                } else {
+                  send('log', { text: 'Aviso: não foi possível enviar boas-vindas' })
+                }
+              }
+            } catch {
+              send('log', { text: 'Aviso: falha ao reiniciar gateway' })
+            }
+          })()
         }
 
         if (/failed|error|timeout/i.test(clean) && !sent) {
