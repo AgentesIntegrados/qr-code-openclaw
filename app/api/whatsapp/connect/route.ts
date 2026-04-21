@@ -8,7 +8,7 @@ const execFileAsync = promisify(execFile)
 async function getLinkedNumber(): Promise<string | null> {
   try {
     const home = process.env.HOME || '/root'
-    const credsPath = join(home, '.openclaw', 'credentials', 'whatsapp', 'default', 'creds.json')
+    const credsPath = join(home, '.openclaw-claw-1', 'credentials', 'whatsapp', 'default', 'creds.json')
     const creds = JSON.parse(await readFile(credsPath, 'utf-8'))
     const jid = creds?.me?.id // "5521936182339:80@s.whatsapp.net"
     if (!jid) return null
@@ -22,7 +22,7 @@ async function getLinkedNumber(): Promise<string | null> {
 async function lockDmToOwner(phone: string) {
   try {
     const home = process.env.HOME || '/root'
-    const cfgPath = join(home, '.openclaw', 'openclaw.json')
+    const cfgPath = join(home, '.openclaw-claw-1', 'openclaw.json')
     const cfg = JSON.parse(await readFile(cfgPath, 'utf-8'))
     const wa = cfg.channels?.whatsapp || {}
     wa.dmPolicy = 'allowlist'
@@ -39,7 +39,8 @@ async function lockDmToOwner(phone: string) {
 
 async function sendWelcomeMessage(phone: string) {
   try {
-    await execFileAsync('openclaw', [
+    await execFileAsync('npx', [
+      'openclaw', '--profile', 'claw-1',
       'message', 'send',
       '--target', phone,
       '--message', 'Meu coração está batendo... */new* sempre que quiser iniciar um novo assunto.'
@@ -66,12 +67,13 @@ export async function GET() {
         )
       }
 
-      // Use openclaw channels login instead of wacli directly
-      const proc = spawn('openclaw', ['channels', 'login', '--channel', 'whatsapp'], {
+      // Use openclaw channels login with claw-1 profile
+      const proc = spawn('npx', ['openclaw', '--profile', 'claw-1', 'channels', 'login', '--channel', 'whatsapp'], {
         env: {
           ...process.env,
           HOME: process.env.HOME || '/root',
         },
+        shell: true,
       })
 
       let qrLines: string[] = []
@@ -128,7 +130,7 @@ export async function GET() {
 
             send('log', { text: 'Reiniciando gateway...' })
             try {
-              await execFileAsync('openclaw', ['gateway', 'restart'], { timeout: 30000 })
+              await execFileAsync('npx', ['openclaw', '--profile', 'claw-1', 'gateway', 'restart'], { timeout: 30000 })
               send('log', { text: 'Gateway reiniciado com sucesso!' })
               await new Promise(r => setTimeout(r, 8000))
               if (phone) {
